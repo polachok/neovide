@@ -128,9 +128,12 @@ impl From<HotReloadConfigs> for UserEvent {
 }
 
 pub fn create_event_loop() -> EventLoop<UserEvent> {
-    EventLoopBuilder::<UserEvent>::with_user_event()
+    let event_loop = EventLoopBuilder::<UserEvent>::with_user_event()
         .build()
-        .expect("Failed to create winit event loop")
+        .expect("Failed to create winit event loop");
+    #[cfg(target_os = "macos")]
+    crate::window::macos::register_file_handler();
+    event_loop
 }
 
 /// Set the window blurred or not.

@@ -175,3 +175,47 @@ impl MacosWindowFeature {
         }
     }
 }
+
+pub fn register_file_handler() {
+    use crate::bridge::{send_ui, ParallelCommand};
+    use cocoa::base::id;
+    use objc::runtime::class_addMethod;
+    use objc::runtime::objc_getClass;
+    use objc::{sel, sel_impl};
+    use objc2::rc::autoreleasepool;
+    use std::ffi::CString;
+
+    extern "C" fn handle_open(
+        _this: id,
+        _sel: objc::runtime::Sel,
+        _sender: id,
+        files: &mut icrate::Foundation::NSArray<icrate::Foundation::NSString>,
+    ) {
+        autoreleasepool(|pool| {
+            for file in files.iter() {
+                let path = file.as_str(pool).to_owned();
+                send_ui(ParallelCommand::FileDrop(path));
+            }
+        });
+    }
+
+    unsafe {
+        let handler_open_files = std::mem::transmute(
+            handle_open
+                as unsafe extern "C" fn(
+                    id,
+                    objc::runtime::Sel,
+                    id,
+                    &mut icrate::Foundation::NSArray<icrate::Foundation::NSString>,
+                ),
+        );
+        let class_name = CString::new("WinitApplicationDelegate").expect("CString::new failed");
+        let res = objc_getClass(class_name.as_ptr()) as *mut _;
+        let _ret = class_addMethod(
+            res,
+            sel!(application:openFiles:),
+            handler_open_files,
+            "v@:@@\0".as_ptr() as *const _,
+        );
+    }
+}
